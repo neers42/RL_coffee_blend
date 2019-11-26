@@ -70,7 +70,7 @@ def get_blend():
                         ,sleep_time,wakeup_time,drink_time)
     #----------csv読み出し部分-----------
     #ユーザのコーヒーブレンド種類の読み出し
-    lst_blend = pd.read_csv(blend_data_path).values.tolist()
+    lst_blend = pd.read_csv(blend_data_path, header = None).values.tolist()
     user_coffee_blend = np.array(lst_blend)
     #Q_tableの読み出し
     lst_q_table = pd.read_csv(Q_Table_path, header = None).values.tolist()
@@ -88,8 +88,8 @@ def get_blend():
                     "WakeupTime" : str(wakeup_time), "Pressure" : str(pressure), 
                     "DiscomfortIndex" : str(discomfort_index),
                     "DrinkTime" : str(drink_time), "UserBlend" : user_blend,
-                    "MainBlend" : str(user_coffee_blend[0]), "SubBlend1" : str(user_coffee_blend[1]),
-                    "SubBlend2" : str(user_coffee_blend[2]),
+                    "MainBlend" : str(user_coffee_blend[0][0]), "SubBlend1" : str(user_coffee_blend[0][1]),
+                    "SubBlend2" : str(user_coffee_blend[0][2]),
                     "MainBlendPercentage" : str(user_blend[0]), "SubBlend1Percentage" : str(user_blend[1]),
                     "SubBlend2Percentage" : str(user_blend[2])}
     try:
