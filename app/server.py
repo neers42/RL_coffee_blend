@@ -35,6 +35,7 @@ def get_blend():
     f = open('temp_token.txt', 'w')
     f.write(user_id)
     f.close()
+    blend_data_path = "./blend_data/" + user_id + "data.csv"
     fitbit_data_path = "./fitbit_data/" + user_id + "_fitbit_data.csv"
     token_file_path = "./fitbit_api/" + user_id + "_token.txt"
     state_file_path = "./" + user_id + "_state.csv"
@@ -68,20 +69,29 @@ def get_blend():
     observation = (discomfort_index,pressure,body_temp
                         ,sleep_time,wakeup_time,drink_time)
     #----------csv読み出し部分-----------
+    #ユーザのコーヒーブレンド種類の読み出し
+    lst_blend = pd.read_csv(blend_data_path).values.tolist()
+    user_coffee_blend = np.array(lst_blend)
+    #Q_tableの読み出し
     lst_q_table = pd.read_csv(Q_Table_path, header = None).values.tolist()
     q_table = np.array(lst_q_table)
+    #状態を離散化する
     state = se.digitize_state(observation, num_dizitized)
     action = np.argmax(q_table[state])
+    #アクションからブレンド比率に変換する
     user_blend = se.convert_action(action)
     lst_observation = list(observation)
     lst_observation.append(state)
     lst_observation.append(action)
+    #jsonデータ化する
     state_data = {"BodyTemperature" : str(body_temp), "SleepTime" : str(sleep_time), 
                     "WakeupTime" : str(wakeup_time), "Pressure" : str(pressure), 
                     "DiscomfortIndex" : str(discomfort_index),
                     "DrinkTime" : str(drink_time), "UserBlend" : user_blend,
-                    "MainBlend" : str(user_blend[0]), "SubBlend1" : str(user_blend[1]),
-                    "SubBlend2" : str(user_blend[2])}
+                    "MainBlend" : str(user_coffee_blend[0]), "SubBlend1" : str(user_coffee_blend[1]),
+                    "SubBlend2" : str(user_coffee_blend[2]),
+                    "MainBlendPercentage" : str(user_blend[0]), "SubBlend1Percentage" : str(user_blend[1]),
+                    "SubBlend2Percentage" : str(user_blend[2])}
     try:
         state_csv = open(state_file_path, 'w', newline = '')
         writer = csv.writer(state_csv)
