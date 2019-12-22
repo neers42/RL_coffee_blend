@@ -30,6 +30,7 @@ def reward_judgement(taste_table, action, correct_blend):
     temp = 0
     same_taste = []
     for i in range(6):
+        
         if taste_table[action][i] == taste_table[correct_blend][i]:
             same_taste.append(i)
         temp += abs(taste_table[action][i] - taste_table[correct_blend][i])
@@ -86,7 +87,6 @@ class QNetwork:
                 target = reward_b + gamma * targetQN.model.predict(state_b)[0][next_action]
             targets[i] = self.model.predict(state_b)    # Qネットワークの出力
             targets[i][action_b] = target               # 教師信号
-            print(target)
 
         self.model.fit(inputs, targets, epochs=50, verbose=0)  # epochsは訓練データの反復回数、verbose=0は表示なしの設定
 
@@ -128,8 +128,7 @@ class Actor:
     def get_action(self, state, episode, mainQN):   # [C]ｔ＋１での行動を返す
         # 徐々に最適行動のみをとる、ε-greedy法
         #epsilonの値を最初は１（探索中心）その後は経験値を基にactionを決定していく
-        epsilon = 0.1 + 0.9 / (1.0 + episode / 5.0)
-        
+        epsilon = 0.1 + 0.9 / (1.0 + episode / 20.0)
         #np.random.uniform(0,1)で0以上1未満の乱数を1つ作成しepsilonと比較
         if epsilon <= np.random.uniform(0, 1): 
             retTargetQs = mainQN.model.predict(state)[0]
@@ -146,7 +145,7 @@ class Actor:
 """
 DQN_MODE = 1    # 1がDQN、0がDDQNです
 LENDER_MODE = 1 # 0は学習後も描画なし、1は学習終了後に描画する
-num_episodes = 100  # 総試行回数
+num_episodes = 5000  # 総試行回数
 max_number_of_steps = 10000  # 1試行のstep数
 goal_average_reward = 195  # この報酬を超えると学習終了
 num_consecutive_iterations = 10  # 学習完了評価の平均計算を行う試行回数
@@ -174,7 +173,7 @@ lst2 = pd.read_csv("blend_table.csv").values.tolist()
 data = np.array(lst1)
 #taste_table：味覚値表
 taste_table = np.array(lst2)
-
+print(taste_table)
  
 # [5.3]メインルーチン--------------------------------------------------------
 for episode in range(num_episodes + 1):  # 試行数分繰り返す 
@@ -185,13 +184,14 @@ for episode in range(num_episodes + 1):  # 試行数分繰り返す
     sleep_time = data[episode][3]       #sleep_time : 睡眠時間
     thi =  data[episode][5]             #thi : 不快指数
     fatigue = data[episode][7]          #fatigue : 肉体的疲労度
-    correct_blend = data[episode][9]    # 正解データ
-    incorrect_blend = data[episode][10]  #actionデータ
+    correct_blend = int(data[episode][9])    # 正解データ
+    incorrect_blend = int(data[episode][10])  #actionデータ
     state = [heart_rate, drink_time, sleep_time, thi, fatigue]
     array_state = np.array(state)     #state配列をnumpy配列に変換
     state = np.reshape(state, [1, 5])   # list型のstateを、1行5列の行列に変換
     episode_reward = 0
     rewards = []
+    print("correct_blend : ",correct_blend)
     
 
     # targetQN = mainQN   # 行動決定と価値計算のQネットワークをおなじにする
@@ -201,6 +201,7 @@ for episode in range(num_episodes + 1):  # 試行数分繰り返す
     for step in range(max_number_of_steps):  # 1試行のループ
         action = actor.get_action(state, episode, mainQN)   # 時刻tでの行動を決定する
         judge = reward_judgement(taste_table, action, correct_blend)
+        print("action : ",action)
         # 報酬を設定し、与える
         if action == correct_blend:   #blend:csvから読み取ったブレンド比率
             reward = 10

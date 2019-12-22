@@ -6,20 +6,20 @@ import pandas as pd
 from time import sleep
 from tqdm import tqdm
 
-print("Please Input User Name!!")
-user_name = str(input("User_Name : "))
-Q_table_path = "./EDB/Q_Table/" + user_name + "_EDB_Q_Table"
+print("Please Input User ID!!")
+user_id = str(input("User_ID : "))
+Q_table_path = "./EDB/Q_Table/" + user_id + "_EDB_Q_Table.csv"
+EDB_path = "./EDB/" + user_id + "_EDB.csv"
+test_path = "./test_data/" + user_id + "_data.csv"
 
 #実験データ
-lst2 = pd.read_csv("test.csv").values.tolist()
+lst2 = pd.read_csv(test_path, encoding = "ANSI").values.tolist()
 #ブレンド味覚値
-lst3 = pd.read_csv("EDB.csv").values.tolist()
-#答え
-lst4 = pd.read_csv("answer.csv").values.tolist()
+lst3 = pd.read_csv(EDB_path, encoding = "ANSI").values.tolist()
+
 
 data = np.array(lst2)
 name = np.array(lst3)
-answer = np.array(lst4)
 print(data)
 # [1]Q関数を離散化して定義する関数　------------                                                                                                                                    
 # 観測した状態を離散値にデジタル変換する                                                                                                                                            
@@ -104,17 +104,17 @@ feedback = []
 for episode in range(num_episodes):  #試行数分繰り返す                                                                                                                              
     # 環境の初期化 
     #状態変数定義
-    discomfort_index = data[episode][0]
+    discomfort_index = float(data[episode][6])
     print("discomfort_index:" + str(discomfort_index)) 
-    pressure = data[episode][1]
+    pressure = float(data[episode][7])
     print("pressure:" + str(pressure)) 
-    body_temp = data[episode][2]
+    body_temp = float(data[episode][2])
     print("body_temp:" + str(body_temp)) 
-    sleep_time = data[episode][3]
+    sleep_time = float(data[episode][4])
     print("sleep_time:" + str(sleep_time)) 
-    wakeup_time = data[episode][4]
+    wakeup_time = float(data[episode][5])
     print("wakeup_time:" + str(wakeup_time))
-    coffee_time = data[episode][5]
+    coffee_time = float(data[episode][3])
     print("coffee_time:" + str(coffee_time))
 
     observation = discomfort_index,pressure,body_temp,sleep_time,wakeup_time,coffee_time
@@ -131,17 +131,17 @@ for episode in range(num_episodes):  #試行数分繰り返す
             reward = -3
             break
         else:
-            if answer[episode][0] == action:
+            if data[episode][10] == action:
                 reward = 1
                 #うまい
                 done = 2
                 break
-            elif answer[episode][1] == action or answer[episode][2] == action:
-                #普通
-                reward = 0
-            else :
+            elif data[episode][11] == action:
                 #まずい
                 reward = -1
+            else :
+                #普通
+                reward = 0
 
         reward_entire[action] += reward  #報酬を追加
 
