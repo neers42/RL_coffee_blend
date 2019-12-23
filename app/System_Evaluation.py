@@ -3,6 +3,9 @@
 import numpy as np
 import time
 import pandas as pd
+import fitbit
+import fitbit_api.fitbit_api as fa
+from Weather_api.weather_api import Weather
 
 # [1]Q関数を離散化して定義する関数　------------                                                                                                                                    
 # 観測した状態を離散値にデジタル変換する                                                                                                                                            
@@ -89,3 +92,27 @@ def update_Qtable(q_table, state, action, reward, next_state):
     for i in range(j):
         q_table[state, i] = (1 - alpha) * q_table[state, action] + alpha * (reward[i] + gamma * next_Max_Q)
     return q_table
+
+if __name__ == "__main__":
+    print("学籍番号を入力してください\n")
+    user_id = input("Student ID : ")
+    Q_Table_path = "./EDB/Q_Table/" + user_id + "_EDB_Q_table.csv"
+    print("各種情報を入力してください\n")
+    discomfort_index = int(input("Discomfort Index : "))
+    pressure = int(input("Pressure : "))
+    body_temp = float(input("Body Temperature : "))
+    sleep_time = int(input("Sleep Time : "))
+    wakeup_time = int(input("WakeUp Time To Drink : "))
+    coffee_time = int(input("Coffee Time : "))
+    
+    #Q_tableの読み込み
+    lst_q_table = pd.read_csv(Q_Table_path, header = None).values.tolist()
+    q_table = np.array(lst_q_table)
+    observation = discomfort_index,pressure,body_temp,sleep_time,wakeup_time,coffee_time
+    state = digitize_state(observation, 6) #離散値の計算(6^6*6)                                                                                                                        
+    action = np.argmax(q_table[state])  #rewardがmaxを引っ張って来る
+    blend = convert_action(action)
+    rec_blend = "メイン :  " + str(blend[0]) + "%  サブ1 : " + str(blend[1]) + "% サブ2 : " + str(blend[2]) + "%\n"
+    print("Action : ", action)
+    print("オススメのブレンドは" + rec_blend)
+
