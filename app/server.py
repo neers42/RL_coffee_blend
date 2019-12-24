@@ -8,12 +8,9 @@ import fitbit_api.fitbit_api as fa
 import System_Evaluation as se
 import csv
 import json
+from ast import literal_eval
 
-#--------身体データ取得部分--------
 
-CLIENT_ID =  "22DR8P"
-CLIENT_SECRET  = "e1fc1be370e61cf466646a1460f9b446"
-episode = 50
 num_dizitized = 6
 #flaskインスタンス生成、portはかぶらないようにする
 app = Flask(__name__)
@@ -32,13 +29,19 @@ def updateToken(token):
 @app.route('/blend', methods = ['GET'])
 def get_blend():
     user_id = str(request.args.get("user_id"))
+    client_id_path = "./fitbit_api/" + user_id + "_client_id.txt"
+    client_id = open(client_id_path).read()
+    #文字列を辞書に変換(literal_eval関数)
+    client_id_dict = literal_eval(client_id)
+    CLIENT_ID = client_id_dict['CLIENT_ID']
+    CLIENT_SECRET = client_id_dict['CLIENT_SECRET']
     f = open('temp_token.txt', 'w')
     f.write(user_id)
     f.close()
     blend_data_path = "./blend_data/" + user_id + "data.csv"
     fitbit_data_path = "./fitbit_data/" + user_id + "_fitbit_data.csv"
     token_file_path = "./fitbit_api/" + user_id + "_token.txt"
-    state_file_path = "./" + user_id + "_state.csv"
+    state_file_path = "./state/" + user_id + "_state.csv"
     Q_Table_path = "./EDB/Q_Table/" + user_id + "_EDB_Q_table.csv"
     DATE = datetime.date.today()
     token_dict = fa.get_token(token_file_path)
