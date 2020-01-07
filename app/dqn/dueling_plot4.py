@@ -29,7 +29,7 @@ def huberloss(y_true, y_pred):
 def plot_history_loss(fit):
     plt.plot(fit.history['loss'], label = "loss for trainng")
     plt.title('Model Loss')
-    plt.xlabel('spisode')
+    plt.xlabel('episode')
     plt.ylabel('loss')
     plt.legend(loc = 'upper right')
 
@@ -53,15 +53,17 @@ def reward_judgement(taste_table, action, correct_blend):
 class QNetwork:
     def __init__(self, learning_rate=0.01, state_size=(5,), action_size=6, 
                  hidden_size=10, dropout = 0.3):
-        self.model = Sequential()
-        self.model.add(Dense(hidden_size, activation = 'relu', input_shape = state_size))
-        self.model.add(Dropout(dropout))
-        self.model.add(Dense(hidden_size, activation = 'relu'))
-        self.model.add(Dropout(dropout))
-        self.model.add(Dense(action_size, activation = 'softmax'))
-        self.optimizer = Adam(lr=learning_rate)   # 誤差を減らす学習方法はAdam
-        self.model.compile(loss=huberloss, optimizer=self.optimizer)
-        #self.model.compile(loss='mse', optimizer=self.optimizer)
+        inputlayer = Input(shape = state_size)
+        middlelayer = Dense(hidden_size, activation = 'relu')(inputlayer)
+        middlelayer = Dense(hidden_size, activation = 'relu')(middlelayer)
+
+        y =Dense(action_size + 1, activation = 'linear')(middlelayer)
+        outputlayer = Lambda(lambda a: K.expand_dims(a[:, 0], -1) + a[:, 1:] - 0.0*K.mean(a[:, 1:], keepdims=True),
+                             output_shape=(action_size,))(y)
+
+        self.model = keras.models.Model(input = inputlayer, output = outputlayer)
+        self.optimizer = Adam(lr = learning_rate)
+        self.model.compile(loss = huberloss, optimizer = self.optimizer)
 
     # 重みの学習
     def replay(self, memory, batch_size, gamma, targetQN):
@@ -97,7 +99,8 @@ class QNetwork:
             targets[i] = self.model.predict(state_b)    # Qネットワークの出力
             targets[i][action_b] = target               # 教師信号
 
-        self.fit = self.model.fit(inputs, targets, epochs=200, verbose=0)  # epochsは訓練データの反復回数、verbose=0は表示なしの設定
+        self.fit = self.model.fit(inputs, targets, epochs=50, verbose=0)  # epochsは訓練データの反復回数、verbose=0は表示なしの設定
+        history_num.append(self.fit.history['loss'])
 """
 [3]Experience ReplayとFixed Target Q-Networkを実現するメモリクラス
 """
@@ -153,7 +156,7 @@ class Actor:
 """
 DQN_MODE = 0    # 1がDQN、0がDDQNです
 LENDER_MODE = 1 # 0は学習後も描画なし、1は学習終了後に描画する
-num_episodes = 200  # 総試行回数
+num_episodes = 50  # 総試行回数
 max_number_of_steps = 10000  # 1試行のstep数
 goal_average_reward = 195  # この報酬を超えると学習終了
 num_consecutive_iterations = 10  # 学習完了評価の平均計算を行う試行回数
@@ -167,98 +170,125 @@ learning_rate = 0.00001         # Q-networkの学習係数
 memory_size = 50000            # バッファーメモリの大きさ
 batch_size = 16                # Q-networkを更新するバッチの大記載
 number = 1
-# [5.2]Qネットワークとメモリ、Actorの生成--------------------------------------------------------
-mainQN = QNetwork(hidden_size=hidden_size, learning_rate=learning_rate)     # メインのQネットワーク
-targetQN = QNetwork(hidden_size=hidden_size, learning_rate=learning_rate)   # 価値を計算するQネットワーク
-memory = Memory(max_size=memory_size)
-actor = Actor()
-print("Please input User ID!!")
-user_id = input("User ID :")
-test_data_path = user_id + "_data.csv"
-#csv読み取り部分
-#data:実験データ
-lst1 = pd.read_csv(test_data_path, encoding = "ANSI").values.tolist()
-data = np.array(lst1)
-print(data)
-#name:ブレンド味覚値
-lst2 = pd.read_csv("blend_table.csv").values.tolist()
-#taste_table：味覚値表
-taste_table = np.array(lst2)
-print(taste_table)
+history_num = []
+users = ["al15042", "al16082", "al16043"]
+for user in users:
+    # [5.2]Qネットワークとメモリ、Actorの生成--------------------------------------------------------
+    mainQN = QNetwork(hidden_size=hidden_size, learning_rate=learning_rate)     # メインのQネットワーク
+    targetQN = QNetwork(hidden_size=hidden_size, learning_rate=learning_rate)   # 価値を計算するQネットワーク
+    memory = Memory(max_size=memory_size)
+    actor = Actor()
+    user_id = user
+    test_data_path = "./test_data/" + user_id + "_data.csv"
+    blend_data_path = "./blend_data/" + user_id + "_blend_data.csv"
+    model_file_path = "./model/" + user_id + "_model.h5"
+    #csv読み取り部分
+    #data:実験データ
+    lst1 = pd.read_csv(test_data_path, encoding = "ANSI").values.tolist()
+    data = np.array(lst1)
+    print(data)
+    #name:ブレンド味覚値
+    lst2 = pd.read_csv("blend_table.csv").values.tolist()
+    #taste_table：味覚値表
+    taste_table = np.array(lst2)
+    print(taste_table)
  
-# [5.3]メインルーチン--------------------------------------------------------
-for episode in range(num_episodes + 1):  # 試行数分繰り返す 
-    # 1step目は適当な行動をとる
-    done = False
-    heart_rate = int(float(data[episode][1]))       #heart_rate : 心拍数
-    drink_time = int(float(data[episode][3]))       #drink_time : 喫飲時間帯
-    sleep_time = int(float(data[episode][4]))       #sleep_time : 睡眠時間
-    thi =  int(float(data[episode][6]))             #thi : 不快指数
-    fatigue = int(float(data[episode][8]))          #fatigue : 肉体的疲労度
-    correct_blend = int(float(data[episode][10]))    # 正解データ
-    incorrect_blend = int(float(data[episode][11]))  # 間違いデータ
-    state = [heart_rate, drink_time, sleep_time, thi, fatigue]
-    array_state = np.array(state)     #state配列をnumpy配列に変換
-    state = np.reshape(state, [1, 5])   # list型のstateを、1行5列の行列に変換
-    episode_reward = 0
-    rewards = []
-    print("correct_blend : ",correct_blend)
+    # [5.3]メインルーチン--------------------------------------------------------
+    for episode in range(num_episodes + 1):  # 試行数分繰り返す 
+        # 1step目は適当な行動をとる
+        done = False
+        heart_rate = int(float(data[episode][1]))       #heart_rate : 心拍数
+        drink_time = int(float(data[episode][3]))       #drink_time : 喫飲時間帯
+        sleep_time = int(float(data[episode][4]))       #sleep_time : 睡眠時間
+        thi =  int(float(data[episode][6]))             #thi : 不快指数
+        fatigue = int(float(data[episode][8]))          #fatigue : 肉体的疲労度
+        correct_blend = int(float(data[episode][10]))    # 正解データ
+        incorrect_blend = int(float(data[episode][11]))  # 間違いデータ
+        state = [heart_rate, drink_time, sleep_time, thi, fatigue]
+        array_state = np.array(state)     #state配列をnumpy配列に変換
+        state = np.reshape(state, [1, 5])   # list型のstateを、1行5列の行列に変換
+        episode_reward = 0
+        rewards = []
+        print("correct_blend : ",correct_blend)
     
 
-    # targetQN = mainQN   # 行動決定と価値計算のQネットワークをおなじにする
-    # ↓
-    targetQN.model.set_weights(mainQN.model.get_weights())
-
-    for step in range(max_number_of_steps):  # 1試行のループ
-        action = actor.get_action(state, episode, mainQN)   # 時刻tでの行動を決定する
-        judge = reward_judgement(taste_table, action, correct_blend)
-        # 報酬を設定し、与える
-        if action == correct_blend:   #blend:csvから読み取ったブレンド比率
-            reward = 10
-            done = True
-        else:
-            #reward_judgement関数で味覚値の差を計算
-            if judge[0] > 0.6:
-                reward = -0.5
-            elif action == incorrect_blend:
-                reward = -1
-            elif len(judge[1]) != 0:
-                length = len(judge[1])
-                reward = 0.5 * (1 / length)
-            else:
-                reward = 0
-        
-        rewards.append(reward)
-        episode_reward += 1    #合計報酬を更新
-        memory.add((state, action, reward))   #メモリの更新（ state, action, reward をタプル型でメモリに保存）
-
-        # Qネットワークの重みを学習・更新する replay
-        if (memory.len() > batch_size*number) and not islearned:
-            mainQN.replay(memory, batch_size, gamma, targetQN)
-            number += 1
-
-        if DQN_MODE:
         # targetQN = mainQN   # 行動決定と価値計算のQネットワークをおなじにする
-            targetQN.model.set_weights(mainQN.model.get_weights())
+        # ↓
+        targetQN.model.set_weights(mainQN.model.get_weights())
 
-        # 1施行終了時の処理
-        if done:
-            score = sum(rewards)
-            total_reward_vec = np.hstack((total_reward_vec[1:], episode_reward))  # 報酬を記録
-            print('%d Episode finished after %f time steps / mean %f  / score : %f' % (episode, step + 1, total_reward_vec.mean(), score))
-            break
-        elif(step == max_number_of_steps):
-            print('%d Episode finished after %f time steps / mean %f' % (episode, step + 1, total_reward_vec.mean()))
-        else:
-            pass
+        for step in range(max_number_of_steps):  # 1試行のループ
+            action = actor.get_action(state, episode, mainQN)   # 時刻tでの行動を決定する
+            judge = reward_judgement(taste_table, action, correct_blend)
+            # 報酬を設定し、与える
+            if action == correct_blend:   #blend:csvから読み取ったブレンド比率
+                reward = 10
+                done = True
+            else:
+                #reward_judgement関数で味覚値の差を計算
+                if judge[0] > 0.6:
+                    reward = -0.5
+                elif action == incorrect_blend:
+                    reward = -1
+                elif len(judge[1]) != 0:
+                    length = len(judge[1])
+                    reward = 0.5 * (1 / length)
+                else:
+                    reward = 0
+        
+            rewards.append(reward)
+            episode_reward += 1    #合計報酬を更新
+            memory.add((state, action, reward))   #メモリの更新（ state, action, reward をタプル型でメモリに保存）
+
+            # Qネットワークの重みを学習・更新する replay
+            if (memory.len() > batch_size*number) and not islearned:
+                mainQN.replay(memory, batch_size, gamma, targetQN)
+                number += 1
+
+            if DQN_MODE:
+            # targetQN = mainQN   # 行動決定と価値計算のQネットワークをおなじにする
+                targetQN.model.set_weights(mainQN.model.get_weights())
+
+            # 1施行終了時の処理
+            if done:
+                score = sum(rewards)
+                total_reward_vec = np.hstack((total_reward_vec[1:], episode_reward))  # 報酬を記録
+                print('%d Episode finished after %f time steps / mean %f  / score : %f' % (episode, step + 1, total_reward_vec.mean(), score))
+                break
+            elif(step == max_number_of_steps):
+                print('%d Episode finished after %f time steps / mean %f' % (episode, step + 1, total_reward_vec.mean()))
+            else:
+                pass
             
-    # 複数施行の平均報酬で終了を判断
-    if episode == 200:
-        print('agent train successfuly!')
-mainQN.model.save('al15042_model.h5')  # h5モデルファイル作成
-print("model save successfuly!")
-figure = plt.subplots(num = None, figsize=(10,6))
-plot_history_loss(mainQN.fit)
-plt.savefig('./' + user_id + '_model_loss.png')
-plt.close()
+        # 複数施行の平均報酬で終了を判断
+        if episode == 50:
+            print('agent train successfuly!')
+    mainQN.model.save('al15042_model.h5')  # h5モデルファイル作成
+    print("model save successfuly!")
 
+
+fig, (ax, ax2, ax3) = plt.subplots(3, 1, sharex = True)
+y1 = history_num[0]
+y2 = history_num[1]
+y3 = history_num[2]
+
+#グラフカラーの指定
+c1,c2,c3 = "blue","green","red"
+
+#ラベルの指定
+l1, l2, l3 = "subject A", "subject B", "subject C"
+ax.set_xlabel('episode')
+ax.set_ylabel('Loss')
+ax.set_title('Model Loss')
+ax.grid()
+ax2.grid()
+ax3.grid()
+
+ax.plot(y1, label = l1)
+ax2.plot(y2, label = l2)
+ax3.plot(y3, label = l3)
+
+
+
+ax.legend(loc = 0)
+plt.savefig('./loss8.png')
+plt.close()

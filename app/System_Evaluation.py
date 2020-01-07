@@ -97,22 +97,30 @@ if __name__ == "__main__":
     print("学籍番号を入力してください\n")
     user_id = input("Student ID : ")
     Q_Table_path = "./EDB/Q_Table/" + user_id + "_EDB_Q_table.csv"
-    print("各種情報を入力してください\n")
-    discomfort_index = int(input("Discomfort Index : "))
-    pressure = int(input("Pressure : "))
-    body_temp = float(input("Body Temperature : "))
-    sleep_time = int(input("Sleep Time : "))
-    wakeup_time = int(input("WakeUp Time To Drink : "))
-    coffee_time = int(input("Coffee Time : "))
+    test_data_path = "./test_data/" + user_id + "_data.csv"
     
+
     #Q_tableの読み込み
     lst_q_table = pd.read_csv(Q_Table_path, header = None).values.tolist()
     q_table = np.array(lst_q_table)
-    observation = discomfort_index,pressure,body_temp,sleep_time,wakeup_time,coffee_time
-    state = digitize_state(observation, 6) #離散値の計算(6^6*6)                                                                                                                        
-    action = np.argmax(q_table[state])  #rewardがmaxを引っ張って来る
-    blend = convert_action(action)
-    rec_blend = "メイン :  " + str(blend[0]) + "%  サブ1 : " + str(blend[1]) + "% サブ2 : " + str(blend[2]) + "%\n"
-    print("Action : ", action)
-    print("オススメのブレンドは" + rec_blend)
+    lst_test_data = pd.read_csv(test_data_path, encoding="ANSI").values.tolist()
+    test_data = np.array(lst_test_data)
+    episode = 51
+    print(test_data)
+    for i in range(10):
+        discomfort_index = int(float(test_data[episode + i][6]))
+        pressure = int(float(test_data[episode + i][7]))
+        body_temp = float(test_data[episode + i][2])
+        sleep_time = int(float(test_data[episode + i][4]))
+        wakeup_time = int(float(test_data[episode + i][5]))
+        coffee_time = int(float(test_data[episode + i][3]))
+        observation = discomfort_index,pressure,body_temp,sleep_time,wakeup_time,coffee_time
+        state = digitize_state(observation, 6) #離散値の計算(6^6*6)                                                                                                                        
+        action = np.argmax(q_table[state])  #rewardがmaxを引っ張って来る
+        blend = convert_action(action)
+        print("episode : ", episode + i)
+        rec_blend = "メイン :  " + str(blend[0]) + "%  サブ1 : " + str(blend[1]) + "% サブ2 : " + str(blend[2]) + "%\n"
+        print("Action : ", action)
+        print("オススメのブレンドは" + rec_blend)
+    print("episode 60 complete!")
 

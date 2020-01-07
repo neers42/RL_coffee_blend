@@ -29,7 +29,7 @@ def huberloss(y_true, y_pred):
 def plot_history_loss(fit):
     plt.plot(fit.history['loss'], label = "loss for trainng")
     plt.title('Model Loss')
-    plt.xlabel('spisode')
+    plt.xlabel('episode')
     plt.ylabel('loss')
     plt.legend(loc = 'upper right')
 
@@ -53,15 +53,18 @@ def reward_judgement(taste_table, action, correct_blend):
 class QNetwork:
     def __init__(self, learning_rate=0.01, state_size=(5,), action_size=6, 
                  hidden_size=10, dropout = 0.3):
-        self.model = Sequential()
-        self.model.add(Dense(hidden_size, activation = 'relu', input_shape = state_size))
-        self.model.add(Dropout(dropout))
-        self.model.add(Dense(hidden_size, activation = 'relu'))
-        self.model.add(Dropout(dropout))
-        self.model.add(Dense(action_size, activation = 'softmax'))
-        self.optimizer = Adam(lr=learning_rate)   # 誤差を減らす学習方法はAdam
-        self.model.compile(loss=huberloss, optimizer=self.optimizer)
-        #self.model.compile(loss='mse', optimizer=self.optimizer)
+        inputlayer = Input(shape = state_size)
+        middlelayer = Dense(hidden_size, activation = 'relu')(inputlayer)
+        middlelayer = Dense(hidden_size, activation = 'relu')(middlelayer)
+
+        y =Dense(action_size + 1, activation = 'linear')(middlelayer)
+        outputlayer = Lambda(lambda a: K.expand_dims(a[:, 0], -1) + a[:, 1:] - 0.0*K.mean(a[:, 1:], keepdims=True),
+                             output_shape=(action_size,))(y)
+
+        self.model = keras.models.Model(input = inputlayer, output = outputlayer)
+        self.optimizer = Adam(lr = learning_rate)
+        self.model.compile(loss = huberloss, optimizer = self.optimizer) 
+
 
     # 重みの学習
     def replay(self, memory, batch_size, gamma, targetQN):
@@ -97,7 +100,7 @@ class QNetwork:
             targets[i] = self.model.predict(state_b)    # Qネットワークの出力
             targets[i][action_b] = target               # 教師信号
 
-        self.fit = self.model.fit(inputs, targets, epochs=200, verbose=0)  # epochsは訓練データの反復回数、verbose=0は表示なしの設定
+        self.fit = self.model.fit(inputs, targets, epochs=2000, verbose=0)  # epochsは訓練データの反復回数、verbose=0は表示なしの設定
 """
 [3]Experience ReplayとFixed Target Q-Networkを実現するメモリクラス
 """
@@ -153,7 +156,7 @@ class Actor:
 """
 DQN_MODE = 0    # 1がDQN、0がDDQNです
 LENDER_MODE = 1 # 0は学習後も描画なし、1は学習終了後に描画する
-num_episodes = 200  # 総試行回数
+num_episodes = 2000  # 総試行回数
 max_number_of_steps = 10000  # 1試行のstep数
 goal_average_reward = 195  # この報酬を超えると学習終了
 num_consecutive_iterations = 10  # 学習完了評価の平均計算を行う試行回数
@@ -174,7 +177,9 @@ memory = Memory(max_size=memory_size)
 actor = Actor()
 print("Please input User ID!!")
 user_id = input("User ID :")
-test_data_path = user_id + "_data.csv"
+test_data_path = "./test_data/" + user_id + "_data.csv"
+blend_data_path = "./blend_data/" + user_id + "_blend_data.csv"
+model_file_path = "./model/" + user_id + "_model.h5"
 #csv読み取り部分
 #data:実験データ
 lst1 = pd.read_csv(test_data_path, encoding = "ANSI").values.tolist()
@@ -253,12 +258,12 @@ for episode in range(num_episodes + 1):  # 試行数分繰り返す
             pass
             
     # 複数施行の平均報酬で終了を判断
-    if episode == 200:
+    if episode == 2000:
         print('agent train successfuly!')
 mainQN.model.save('al15042_model.h5')  # h5モデルファイル作成
 print("model save successfuly!")
 figure = plt.subplots(num = None, figsize=(10,6))
 plot_history_loss(mainQN.fit)
-plt.savefig('./' + user_id + '_model_loss.png')
+plt.savefig('./model_loss/'+ user_id + '/' + user_id + '_model_loss' + str(num_episodes) + '.png')
 plt.close()
 
